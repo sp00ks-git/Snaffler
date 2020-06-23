@@ -17,6 +17,8 @@ namespace SnaffCore.Config
         public List<ClassifierRule> FileClassifiers { get; set; } = new List<ClassifierRule>();
         [Nett.TomlIgnore]
         public List<ClassifierRule> ContentsClassifiers { get; set; } = new List<ClassifierRule>();
+        [Nett.TomlIgnore]
+        public List<ClassifierRule> ArchiveContentClassifiers { get; set; } = new List<ClassifierRule>(); 
 
         public void PrepareClassifiers()
         {
@@ -33,7 +35,6 @@ namespace SnaffCore.Config
                             classifierRule.Regexes.Add(new Regex(pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
-
                         break;
                     case MatchListType.Contains:
                         classifierRule.Regexes = new List<Regex>();
@@ -43,7 +44,6 @@ namespace SnaffCore.Config
                             classifierRule.Regexes.Add(new Regex(pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
-
                         break;
                     case MatchListType.EndsWith:
                         foreach (string word in classifierRule.WordList)
@@ -53,7 +53,6 @@ namespace SnaffCore.Config
                             classifierRule.Regexes.Add(new Regex(pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
-
                         break;
                     case MatchListType.StartsWith:
                         foreach (string word in classifierRule.WordList)
@@ -63,7 +62,6 @@ namespace SnaffCore.Config
                             classifierRule.Regexes.Add(new Regex(pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
-
                         break;
                     case MatchListType.Exact:
                         foreach (string word in classifierRule.WordList)
@@ -73,7 +71,6 @@ namespace SnaffCore.Config
                             classifierRule.Regexes.Add(new Regex(pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
-
                         break;
 
                 }
@@ -92,6 +89,7 @@ namespace SnaffCore.Config
             ContentsClassifiers = (from classifier in ClassifierRules
                                    where classifier.EnumerationScope == EnumerationScope.ContentsEnumeration
                                    select classifier).ToList();
+            ArchiveContentClassifiers = (from classifier in ClassifierRules where (classifier.EnumerationScope == EnumerationScope.FileEnumeration) && (classifier.MatchLocation != MatchLoc.FileContentAsString) select classifier).ToList();
         }
 
         public void BuildDefaultClassifiers()

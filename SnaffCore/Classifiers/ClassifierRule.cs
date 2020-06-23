@@ -64,7 +64,7 @@ namespace Classifiers
         Snaffle,
         Relay,
         CheckForKeys,
-        EnterArchive
+        ScanArchive
     }
 
     public enum Triage

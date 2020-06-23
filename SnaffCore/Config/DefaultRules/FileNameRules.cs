@@ -7,6 +7,47 @@ namespace SnaffCore.Config
     {
         private void BuildFileNameRules()
         {
+            // Archives
+            this.ClassifierRules.Add(
+                new ClassifierRule()
+                {
+                    Description = "Files with these extensions will be examined as archive files.",
+                RuleName = "ArchiveContentByExt",
+                EnumerationScope = EnumerationScope.FileEnumeration,
+                MatchLocation = MatchLoc.FileExtension,
+                WordListType = MatchListType.Exact,
+                MatchAction = MatchAction.ScanArchive,
+                WordList = new List<string>()
+                {
+                    ".7z",
+                    ".7zip",
+                    ".apk",
+                    ".bz",
+                    ".bz2",
+                    ".bzip",
+                    ".gz",
+                    ".gzip",
+                    ".jar",
+                    ".lzip",
+                    ".lzma",
+                    ".lzo",
+                    ".rar",
+                    ".tar.bz2",
+                    ".tar.gz",
+                    ".tar.lz",
+                    ".tar.xz",
+                    ".tar.z",
+                    ".tar",
+                    ".tbz2",
+                    ".tgz",
+                    ".tlz",
+                    ".txz",
+                    ".war",
+                    ".xz",
+                    ".zip",
+                    ".zipx",
+                    },
+                });
             this.ClassifierRules.Add(
                 new ClassifierRule()
                 {

@@ -1,4 +1,6 @@
-﻿using SnaffCore.Concurrency;
+﻿using SnaffCore;
+using SnaffCore.ArchiveScanner;
+using SnaffCore.Concurrency;
 using System;
 using System.IO;
 using System.Linq;
@@ -13,10 +15,14 @@ namespace Classifiers
     public class FileClassifier
     {
         private ClassifierRule ClassifierRule { get; set; }
+        private BlockingStaticTaskScheduler FileTaskScheduler { get; set; }
+        private ArchiveScanner ArchiveScanner { get; set; }
 
         public FileClassifier(ClassifierRule inRule)
         {
             this.ClassifierRule = inRule;
+            FileTaskScheduler = SnaffCon.GetFileTaskScheduler();
+            ArchiveScanner = SnaffCon.GetArchiveScanner();
         }
 
         public bool ClassifyFile(FileInfo fileInfo)
@@ -142,11 +148,9 @@ namespace Classifiers
                         Mq.Trace(e.ToString());
                     }
                     return false;
-                case MatchAction.EnterArchive:
-                    // do a special looking inside archive files dance using
-                    // https://github.com/adamhathcock/sharpcompress
-                    // TODO FUUUUUCK
-                    throw new NotImplementedException("Haven't implemented walking dir structures inside archives. Prob needs pool queue.");
+                case MatchAction.ScanArchive:
+                    ArchiveScanner.ScanArchive(fileInfo);
+                    return true;
                 default:
                     Mq.Error("You've got a misconfigured file ClassifierRule named " + ClassifierRule.RuleName + ".");
                     return false;

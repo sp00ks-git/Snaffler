@@ -5,23 +5,23 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using SnaffCore;
+using System.Collections.Generic;
+using Classifiers;
 
-namespace Classifiers
+namespace SnaffCore.ArchiveScan
 {
-    public class ArchiveClassifier
+    public class ArchiveScanner
     {
-        // TODO VERY WORK IN PROGRESS
-
         private BlockingMq Mq { get; set; }
-        private FileScanner FileScanner {get; set;}
+        private FileScanner FileScanner { get; set; }
 
-        public ArchiveClassifier(FileInfo fileInfo)
+        public ArchiveScanner()
         {
             Mq = BlockingMq.GetMq();
-            FileScanner = SnaffCon.GetFileScanner();
+            FileScanner = SnaffCon.GetArchiveFileScanner();
         }
 
-        private void ClassifyArchive(FileInfo fileInfo)
+        public void ScanArchive(FileInfo fileInfo)
         {
             // look inside archives for files we like.
             try

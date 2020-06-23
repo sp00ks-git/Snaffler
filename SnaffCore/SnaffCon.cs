@@ -1,5 +1,6 @@
 ﻿using Classifiers;
 using SnaffCore.ActiveDirectory;
+using SnaffCore.ArchiveScan;
 using SnaffCore.Concurrency;
 using SnaffCore.Config;
 using SnaffCore.ShareFind;
@@ -30,6 +31,8 @@ namespace SnaffCore
         private static ShareFinder ShareFinder;
         private static TreeWalker TreeWalker;
         private static FileScanner FileScanner;
+        private static FileScanner ArchiveFileScanner;
+        private static ArchiveScanner ArchiveScanner;
 
         public SnaffCon(Options options)
         {
@@ -44,9 +47,11 @@ namespace SnaffCore
             TreeTaskScheduler = new BlockingStaticTaskScheduler(treeThreads, MyOptions.MaxTreeQueue);
             FileTaskScheduler = new BlockingStaticTaskScheduler(fileThreads, MyOptions.MaxFileQueue);
 
-            FileScanner = new FileScanner();
+            FileScanner = new FileScanner(MyOptions.FileClassifiers);
             TreeWalker = new TreeWalker();
             ShareFinder = new ShareFinder();
+            ArchiveFileScanner = new FileScanner(MyOptions.ArchiveContentClassifiers);
+            ArchiveScanner = new ArchiveScanner();
         }
 
         public static ShareFinder GetShareFinder()
@@ -60,6 +65,14 @@ namespace SnaffCore
         public static FileScanner GetFileScanner()
         {
             return FileScanner;
+        }
+        public static FileScanner GetArchiveFileScanner()
+        {
+            return ArchiveFileScanner;
+        }
+        public static ArchiveScanner GetArchiveScanner()
+        {
+            return ArchiveScanner;
         }
         public static BlockingStaticTaskScheduler GetShareTaskScheduler()
         {
