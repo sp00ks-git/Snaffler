@@ -1,5 +1,6 @@
 ﻿using Classifiers;
 using SnaffCore.Concurrency;
+using SnaffCore.Config;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,11 +13,12 @@ namespace SnaffCore.FileScan
         private BlockingMq Mq { get; set; }
         private List<ClassifierRule> FileClassifiers { get; set; }
 
-        public FileScanner(List<ClassifierRule> fileClassifiers)
+        public FileScanner()
         {
             Mq = BlockingMq.GetMq();
-            FileClassifiers = fileClassifiers;
+            FileClassifiers = MyOptions.FileClassifiers;
         }
+
         public void ScanFile(string file)
         {
             try

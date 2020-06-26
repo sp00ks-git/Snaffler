@@ -6,8 +6,10 @@ using SnaffCore.Concurrency;
 using SnaffCore.Config;
 using System;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.IO;
 using System.Threading.Tasks;
+using NLog.LayoutRenderers;
 
 namespace Snaffler
 {
@@ -234,10 +236,23 @@ namespace Snaffler
 
                 string matchedstring = "";
 
-                long fileSize = message.FileResult.FileInfo.Length;
-                string fileSizeString = BytesToString(fileSize);
+                string fileSizeString;
+                try
+                {
+                    long fileSize = message.FileResult.FileInfo.Length;
+                    fileSizeString = BytesToString(fileSize);
+                }
+                catch (System.IO.FileNotFoundException e)
+                {
+                    fileSizeString = "ArchiveContent";
+                }
 
                 string filepath = message.FileResult.FileInfo.FullName;
+                if (!String.IsNullOrEmpty(message.FileResult.SourceArchive))
+                {
+                    string fileName = Path.GetFileName(filepath);
+                    filepath = message.FileResult.SourceArchive + " contains " + fileName;
+                }
 
                 string matchcontext = "";
                 if (message.FileResult.TextResult != null)

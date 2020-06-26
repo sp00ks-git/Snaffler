@@ -15,7 +15,7 @@ namespace Classifiers
             this.ClassifierRule = inRule;
         }
 
-        public void ClassifyContent(FileInfo fileInfo)
+        public bool ClassifyContent(FileInfo fileInfo, string archivePath = "")
         {
             BlockingMq Mq = BlockingMq.GetMq();
             FileResult fileResult;
@@ -34,9 +34,14 @@ namespace Classifiers
                                 {
                                     MatchedRule = ClassifierRule
                                 };
+                                if (!String.IsNullOrEmpty(archivePath))
+                                {
+                                    fileResult.SourceArchive = archivePath;
+                                }
                                 Mq.FileResult(fileResult);
+                                return true;
                             }
-                            return;
+                            return false;
                         case MatchLoc.FileContentAsString:
                             try
                             {
@@ -51,18 +56,23 @@ namespace Classifiers
                                         MatchedRule = ClassifierRule,
                                         TextResult = textResult
                                     };
+                                    if (!String.IsNullOrEmpty(archivePath))
+                                    {
+                                        fileResult.SourceArchive = archivePath;
+                                    }
                                     Mq.FileResult(fileResult);
+                                    return true;
                                 }
                             }
                             catch (UnauthorizedAccessException)
                             {
-                                return;
+                                return false;
                             }
                             catch (IOException)
                             {
-                                return;
+                                return false;
                             }
-                            return;
+                            return false;
                         case MatchLoc.FileLength:
                             try
                             {
@@ -73,18 +83,23 @@ namespace Classifiers
                                     {
                                         MatchedRule = ClassifierRule
                                     };
+                                    if (!String.IsNullOrEmpty(archivePath))
+                                    {
+                                        fileResult.SourceArchive = archivePath;
+                                    }
                                     Mq.FileResult(fileResult);
+                                    return true;
                                 }
                             }
                             catch (UnauthorizedAccessException)
                             {
-                                return;
+                                return false;
                             }
                             catch (IOException)
                             {
-                                return;
+                                return false;
                             }
-                            return;
+                            return false;
                         case MatchLoc.FileMD5:
                             try
                             {
@@ -95,21 +110,26 @@ namespace Classifiers
                                     {
                                         MatchedRule = ClassifierRule
                                     };
+                                    if (!String.IsNullOrEmpty(archivePath))
+                                    {
+                                        fileResult.SourceArchive = archivePath;
+                                    }
                                     Mq.FileResult(fileResult);
+                                    return true;
                                 }
                             }
                             catch (UnauthorizedAccessException)
                             {
-                                return;
+                                return false;
                             }
                             catch (IOException)
                             {
-                                return;
+                                return false;
                             }
-                            return;
+                            return false;
                         default:
                             Mq.Error("You've got a misconfigured file ClassifierRule named " + ClassifierRule.RuleName + ".");
-                            return;
+                            return false;
                     }
                 }
                 else
@@ -120,8 +140,10 @@ namespace Classifiers
             catch (Exception e)
             {
                 Mq.Error(e.ToString());
-                return;
+                return false;
             }
+
+            return false;
         }
 
         public bool SizeMatch(FileInfo fileInfo)

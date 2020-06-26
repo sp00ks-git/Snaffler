@@ -1,5 +1,5 @@
 ﻿using SnaffCore;
-using SnaffCore.ArchiveScanner;
+using SnaffCore.ArchiveScan;
 using SnaffCore.Concurrency;
 using System;
 using System.IO;
@@ -15,17 +15,15 @@ namespace Classifiers
     public class FileClassifier
     {
         private ClassifierRule ClassifierRule { get; set; }
-        private BlockingStaticTaskScheduler FileTaskScheduler { get; set; }
         private ArchiveScanner ArchiveScanner { get; set; }
 
         public FileClassifier(ClassifierRule inRule)
         {
             this.ClassifierRule = inRule;
-            FileTaskScheduler = SnaffCon.GetFileTaskScheduler();
             ArchiveScanner = SnaffCon.GetArchiveScanner();
         }
 
-        public bool ClassifyFile(FileInfo fileInfo)
+        public bool ClassifyFile(FileInfo fileInfo, bool isInArchive = false)
         {
             BlockingMq Mq = BlockingMq.GetMq();
             // figure out what part we gonna look at
@@ -35,7 +33,7 @@ namespace Classifiers
             {
                 case MatchLoc.FileExtension:
                     stringToMatch = fileInfo.Extension;
-                    // special handling to treat files named like 'thing.kdbx.bak'
+                    // special handling to treat files named like 'thing.kdbx.bak' as 'thing.kdbx'
                     if (stringToMatch == ".bak")
                     {
                         // strip off .bak
@@ -85,7 +83,12 @@ namespace Classifiers
                 }
             }
 
-            FileResult fileResult;
+            FileResult fileResult = new FileResult(fileInfo);
+            // if it's a file inside an archive, put some dummy values in for some stuff:
+            if (isInArchive)
+            {
+                fileResult.RwStatus = new RwStatus() { CanRead = true, CanWrite = true };
+            }
             // if it matches, see what we're gonna do with it
             switch (ClassifierRule.MatchAction)
             {
@@ -94,25 +97,29 @@ namespace Classifiers
                     return true;
                 case MatchAction.Snaffle:
                     // snaffle that bad boy
-                    fileResult = new FileResult(fileInfo)
-                    {
-                        MatchedRule = ClassifierRule,
-                        TextResult = textResult
-                    };
+                    fileResult.MatchedRule = ClassifierRule;
+                    fileResult.TextResult = textResult;
                     Mq.FileResult(fileResult);
                     return true;
                 case MatchAction.CheckForKeys:
+                    if (isInArchive)
+                    {
+                        // return early for files found in archives so we can handle them inside the special archive scanner.
+                        return true;
+                    }
                     // do a special x509 dance
                     if (x509PrivKeyMatch(fileInfo))
                     {
-                        fileResult = new FileResult(fileInfo)
-                        {
-                            MatchedRule = ClassifierRule
-                        };
+                        fileResult.MatchedRule = ClassifierRule;
                         Mq.FileResult(fileResult);
                     }
                     return true;
                 case MatchAction.Relay:
+                    if (isInArchive)
+                    {
+                        // return early for files found in archives so we can handle them inside the special archive scanner.
+                        return true;
+                    }
                     // bounce it on to the next ClassifierRule
                     // TODO concurrency uplift make this a new task on the poolq
                     try
@@ -123,14 +130,21 @@ namespace Classifiers
                         if (nextRule.EnumerationScope == EnumerationScope.ContentsEnumeration)
                         {
                             ContentClassifier nextContentClassifier = new ContentClassifier(nextRule);
-                            nextContentClassifier.ClassifyContent(fileInfo);
-                            return true;
+                            if (nextContentClassifier.ClassifyContent(fileInfo))
+                            {
+                                return true;
+                            }
+                            return false;
                         }
                         else if (nextRule.EnumerationScope == EnumerationScope.FileEnumeration)
                         {
                             FileClassifier nextFileClassifier = new FileClassifier(nextRule);
-                            nextFileClassifier.ClassifyFile(fileInfo);
-                            return true;
+                            if (nextFileClassifier.ClassifyFile(fileInfo))
+                            {
+                                return true;
+                            }
+
+                            return false;
                         }
                         else
                         {
@@ -149,8 +163,16 @@ namespace Classifiers
                     }
                     return false;
                 case MatchAction.ScanArchive:
-                    ArchiveScanner.ScanArchive(fileInfo);
-                    return true;
+                    if (isInArchive)
+                    {
+                        // return early for files found in archives so we can handle them inside the special archive scanner.
+                        return true;
+                    }
+                    if (ArchiveScanner.ScanArchive(fileInfo))
+                    {
+                        return true;
+                    }
+                    return false;
                 default:
                     Mq.Error("You've got a misconfigured file ClassifierRule named " + ClassifierRule.RuleName + ".");
                     return false;
@@ -283,6 +305,7 @@ namespace Classifiers
     {
         public FileInfo FileInfo { get; set; }
         public TextResult TextResult { get; set; }
+        public String SourceArchive { get; set; }
         public RwStatus RwStatus { get; set; }
         public ClassifierRule MatchedRule { get; set; }
 

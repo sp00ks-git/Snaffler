@@ -63,6 +63,9 @@ namespace SnaffCore.Config
         // Content processing options
         public int MatchContextBytes { get; set; } = 200;
 
+        public bool UnpackArchivesToDisk { get; set; } = true;
+        public string ArchiveUnpackPath { get; set; } = "C:\\users\\mike\\desktop\\UnpackedArchives";
+
         public Options()
         {
             //PrepareClassifiers();
