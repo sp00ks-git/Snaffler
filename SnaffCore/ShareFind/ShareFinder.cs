@@ -113,7 +113,7 @@ namespace SnaffCore.ShareFind
                 //", but this is usually no cause for alarm.");
                 return null;
             }
-            return $"\\\\{computer}\\{hostShareInfo.shi1_netname}";
+            return Path.PathSeparator + Path.PathSeparator + computer + Path.PathSeparator + hostShareInfo.shi1_netname;
         }
 
         private HostShareInfo[] GetHostShareInfo(string server)

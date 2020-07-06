@@ -1,5 +1,6 @@
 ﻿using Classifiers;
 using System.Collections.Generic;
+using System.IO;
 
 namespace SnaffCore.Config
 {
@@ -17,8 +18,8 @@ namespace SnaffCore.Config
                 WordListType = MatchListType.EndsWith,
                 WordList = new List<string>()
                     {
-                        "\\print$",
-                        "\\ipc$"
+                        Path.PathSeparator + "print$",
+                        Path.PathSeparator + "ipc$"
                     },
             });
             this.ClassifierRules.Add(new ClassifierRule()
@@ -32,8 +33,8 @@ namespace SnaffCore.Config
                 Triage = Triage.Black,
                 WordList = new List<string>()
                     {
-                        "\\C$",
-                        "\\ADMIN$"
+                        Path.PathSeparator + "C$",
+                        Path.PathSeparator + "ADMIN$"
                     },
             });
             this.ClassifierRules.Add(new ClassifierRule()
@@ -47,7 +48,7 @@ namespace SnaffCore.Config
                 Triage = Triage.Black,
                 WordList = new List<string>()
                     {
-                        "\\Users",
+                        Path.PathSeparator + "Users",
                     },
             });
         }

@@ -304,7 +304,7 @@ namespace Classifiers
             }
             catch
             {
-                return null;
+                return new RwStatus {CanWrite = false, CanRead = true};
             }
         }
 

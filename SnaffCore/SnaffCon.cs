@@ -13,6 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Timers;
+using SharpCifs.Smb;
 using static SnaffCore.Config.Options;
 using Timer = System.Timers.Timer;
 
@@ -76,6 +77,26 @@ namespace SnaffCore
 
         public void Execute()
         {
+
+//Get SmbFile-Object of a folder.
+            var folder = new SmbFile("smb://mike:d4iTCDLlC5YI@192.168.1.10/RZ-1/");
+
+//UnixTime
+            var epocDate = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+//List items
+            foreach (SmbFile item in folder.ListFiles())
+            {
+                var lastModDate = epocDate.AddMilliseconds(item.LastModified())
+                    .ToLocalTime();
+
+                var name = item.GetName();
+                var type = item.IsDirectory() ? "dir" : "file";
+                var date = lastModDate.ToString("yyyy-MM-dd HH:mm:ss");
+                var msg = $"{name} ({type}) - LastMod: {date}";
+                Console.WriteLine(msg);
+            }
+            
             DateTime startTime = DateTime.Now;
             // This is the main execution thread.
             Timer statusUpdateTimer =
