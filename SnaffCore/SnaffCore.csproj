@@ -6,7 +6,7 @@
 
     <ItemGroup>
       <PackageReference Include="Nett.Coma" Version="0.15.0" />
-      <PackageReference Include="SharpCifs.Core" Version="0.2.3" />
+      <PackageReference Include="SharpCifs.Std" Version="0.2.13" />
       <PackageReference Include="SharpCompress" Version="0.25.1" />
       <PackageReference Include="System.DirectoryServices" Version="5.0.0-preview.6.20305.6" />
     </ItemGroup>

@@ -77,25 +77,15 @@ namespace SnaffCore
 
         public void Execute()
         {
+            SharpCifs.Config.SetProperty("jcifs.smb.client.lport", "8137");
 
-//Get SmbFile-Object of a folder.
-            var folder = new SmbFile("smb://mike:d4iTCDLlC5YI@192.168.1.10/RZ-1/");
 
-//UnixTime
-            var epocDate = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+//You can store authentication information in SharpCifs.Std.
+            SharpCifs.Config.SetProperty("jcifs.smb.client.username", "administrator");
+            SharpCifs.Config.SetProperty("jcifs.smb.client.password", "2arkU2WBx4");
 
-//List items
-            foreach (SmbFile item in folder.ListFiles())
-            {
-                var lastModDate = epocDate.AddMilliseconds(item.LastModified())
-                    .ToLocalTime();
-
-                var name = item.GetName();
-                var type = item.IsDirectory() ? "dir" : "file";
-                var date = lastModDate.ToString("yyyy-MM-dd HH:mm:ss");
-                var msg = $"{name} ({type}) - LastMod: {date}";
-                Console.WriteLine(msg);
-            }
+            var smb4 = new SmbFile("smb://192.168.1.140/tmp/script.bat");
+            Console.WriteLine($"exists? {smb4.Exists()}");
             
             DateTime startTime = DateTime.Now;
             // This is the main execution thread.
