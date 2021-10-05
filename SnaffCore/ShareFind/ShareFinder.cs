@@ -36,16 +36,43 @@ namespace SnaffCore.ShareFind
                 {
                     bool matched = false;
 
-                    // classify them
-                    foreach (ClassifierRule classifier in MyOptions.ShareClassifiers)
-                    {
-                        ShareClassifier shareClassifier = new ShareClassifier(classifier);
-                        if (shareClassifier.ClassifyShare(shareName))
-                        {
+                    // SYSVOL and NETLOGON shares are replicated so they have special logic - do not use Classifiers for these
+                    switch (hostShareInfo.shi1_netname.ToUpper())
+                    {    
+                        case "SYSVOL":
+                            if (MyOptions.ScanSysvol == true)
+                            {
+                                //  leave matched as false so that we don't suppress the TreeWalk for the first SYSVOL replica we see
+                                //  toggle the flag so that any other shares replica will be skipped
+                                MyOptions.ScanSysvol = false;
+                                break;
+                            }
                             matched = true;
                             break;
-                        }
+                        case "NETLOGON":
+                            if (MyOptions.ScanNetlogon == true)
+                            {                                
+                                //  same as SYSVOL above
+                                MyOptions.ScanNetlogon = false;
+                                break;
+                            }
+                            matched = true;
+                            break;
+                        default:
+                            // classify them
+                            foreach (ClassifierRule classifier in MyOptions.ShareClassifiers)
+                            {
+                                ShareClassifier shareClassifier = new ShareClassifier(classifier);
+                                if (shareClassifier.ClassifyShare(shareName))
+                                {
+                                    // in this instance 'matched' means 'don't send to treewalker'.
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            break;
                     }
+
                     // by default all shares should go on to TreeWalker unless the classifier pulls them out.
                     // send them to TreeWalker
                     if (!matched)
@@ -55,11 +82,12 @@ namespace SnaffCore.ShareFind
                             ShareResult shareResult = new ShareResult()
                             {
                                 Listable = true,
-                                SharePath = shareName
+                                SharePath = shareName,
+                                ShareComment = hostShareInfo.shi1_remark.ToString()
                             };
                             Mq.ShareResult(shareResult);
 
-                            Mq.Info("Creating a TreeWalker task for " + shareResult.SharePath);
+                            Mq.Trace("Creating a TreeWalker task for " + shareResult.SharePath);
                             TreeTaskScheduler.New(() =>
                             {
                                 try

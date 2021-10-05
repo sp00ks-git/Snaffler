@@ -17,8 +17,8 @@ namespace SnaffCore.Config
                 WordListType = MatchListType.EndsWith,
                 WordList = new List<string>()
                     {
-                        "\\print$",
-                        "\\ipc$"
+                        "\\\\print\\$",
+                        "\\\\ipc\\$"
                     },
             });
             this.ClassifierRules.Add(new ClassifierRule()
@@ -32,10 +32,11 @@ namespace SnaffCore.Config
                 Triage = Triage.Black,
                 WordList = new List<string>()
                     {
-                        "\\C$",
-                        "\\ADMIN$"
+                        "\\\\C\\$",
+                        "\\\\ADMIN\\$"
                     },
             });
+            /*
             this.ClassifierRules.Add(new ClassifierRule()
             {
                 RuleName = "KeepShareRed",
@@ -50,6 +51,7 @@ namespace SnaffCore.Config
                         "\\Users",
                     },
             });
+            */
         }
 
         /*

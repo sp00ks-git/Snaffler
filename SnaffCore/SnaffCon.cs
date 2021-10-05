@@ -1,4 +1,4 @@
-﻿using Classifiers;
+using Classifiers;
 using SnaffCore.ActiveDirectory;
 using SnaffCore.Concurrency;
 using SnaffCore.Config;
@@ -20,7 +20,8 @@ namespace SnaffCore
 {
     public class SnaffCon
     {
-        private bool AllTasksComplete { get; set; } = false;
+        private readonly EventWaitHandle waitHandle = new AutoResetEvent(false);
+
         private BlockingMq Mq { get; set; }
 
         private static BlockingStaticTaskScheduler ShareTaskScheduler;
@@ -30,6 +31,8 @@ namespace SnaffCore
         private static ShareFinder ShareFinder;
         private static TreeWalker TreeWalker;
         private static FileScanner FileScanner;
+
+        private DateTime StartTime { get; set; }
 
         public SnaffCon(Options options)
         {
@@ -76,10 +79,10 @@ namespace SnaffCore
 
         public void Execute()
         {
-            DateTime startTime = DateTime.Now;
+            StartTime = DateTime.Now;
             // This is the main execution thread.
             Timer statusUpdateTimer =
-                new Timer(TimeSpan.FromMinutes(0.5)
+                new Timer(TimeSpan.FromMinutes(1)
                     .TotalMilliseconds)
                 { AutoReset = true }; // Set the time (1 min in this case)
             statusUpdateTimer.Elapsed += TimedStatusUpdate;
@@ -106,11 +109,11 @@ namespace SnaffCore
                 Mq.Error("OctoParrot says: AWK! I SHOULDN'T BE!");
             }
 
-            SpinWait.SpinUntil(() => AllTasksComplete);
+            waitHandle.WaitOne();
 
             StatusUpdate();
             DateTime finished = DateTime.Now;
-            TimeSpan runSpan = finished.Subtract(startTime);
+            TimeSpan runSpan = finished.Subtract(StartTime);
             Mq.Info("Finished at " + finished.ToLocalTime());
             Mq.Info("Snafflin' took " + runSpan);
             Mq.Finish();
@@ -169,7 +172,7 @@ namespace SnaffCore
                         {
                             string pattern = "( |'|\")" + Regex.Escape(user) + "( |'|\")";
                             Regex regex = new Regex(pattern,
-                                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
                             configClassifierRule.Regexes.Add(regex);
                         }
                     }
@@ -183,11 +186,11 @@ namespace SnaffCore
 
         private void ShareDiscovery(string[] computerTargets)
         {
-            Mq.Info("Starting to find readable shares.");
+            Mq.Info("Starting to look for readable shares...");
             foreach (string computer in computerTargets)
             {
                 // ShareFinder Task Creation - this kicks off the rest of the flow
-                Mq.Info("Creating a sharefinder task for " + computer);
+                Mq.Trace("Creating a sharefinder task for " + computer);
                 ShareTaskScheduler.New(() =>
                 {
                     try
@@ -260,13 +263,57 @@ namespace SnaffCore
             updateText.Append("FileScanner Tasks Completed: " + fileTaskCounters.CompletedTasks + "\n");
             updateText.Append("FileScanner Tasks Remaining: " + fileTaskCounters.CurrentTasksRemaining + "\n");
             updateText.Append("FileScanner Tasks Running: " + fileTaskCounters.CurrentTasksRunning + "\n");
-            updateText.Append(memorynumber + " RAM in use.");
+            updateText.Append(memorynumber + " RAM in use." + "\n");
+            updateText.Append("\n");
+
+            // if all share tasks have finished, reduce max parallelism to 0 and reassign capacity to file scheduler.
+            if (ShareTaskScheduler.Done() && (shareTaskCounters.MaxParallelism >= 1))
+            {
+                // get the current number of sharetask threads
+                int transferVal = shareTaskCounters.MaxParallelism;
+                // set it to zero
+                ShareTaskScheduler.Scheduler._maxDegreeOfParallelism = 0;
+                // add 1 to the other
+                FileTaskScheduler.Scheduler._maxDegreeOfParallelism = FileTaskScheduler.Scheduler._maxDegreeOfParallelism + transferVal;
+                updateText.Append("ShareScanner queue finished, rebalancing workload." + "\n");
+            }
+
+            // do other rebalancing
+
+            if (fileTaskCounters.CurrentTasksQueued <= (MyOptions.MaxFileQueue / 20))
+            {
+                // but only if one side isn't already at minimum
+                if (FileTaskScheduler.Scheduler._maxDegreeOfParallelism > 1)
+                {
+                    updateText.Append("Insufficient FileScanner queue size, rebalancing workload." + "\n");
+                    --FileTaskScheduler.Scheduler._maxDegreeOfParallelism;
+                    ++TreeTaskScheduler.Scheduler._maxDegreeOfParallelism;
+                }
+            }
+            if (fileTaskCounters.CurrentTasksQueued == MyOptions.MaxFileQueue)
+            {
+                if (TreeTaskScheduler.Scheduler._maxDegreeOfParallelism > 1)
+                {
+                    updateText.Append("Max FileScanner queue size reached, rebalancing workload." + "\n");
+                    ++FileTaskScheduler.Scheduler._maxDegreeOfParallelism;
+                    --TreeTaskScheduler.Scheduler._maxDegreeOfParallelism;
+                }
+            }
+
+            updateText.Append("Max ShareFinder Threads: " + ShareTaskScheduler.Scheduler._maxDegreeOfParallelism + "\n");
+            updateText.Append("Max TreeWalker Threads: " + TreeTaskScheduler.Scheduler._maxDegreeOfParallelism + "\n");
+            updateText.Append("Max FileScanner Threads: " + FileTaskScheduler.Scheduler._maxDegreeOfParallelism + "\n");
+
+            DateTime now = DateTime.Now;
+            TimeSpan runSpan = now.Subtract(StartTime);
+
+            updateText.Append("Been Snafflin' for " + runSpan + " and we ain't done yet..." + "\n");
 
             Mq.Info(updateText.ToString());
 
             if (FileTaskScheduler.Done() && ShareTaskScheduler.Done() && TreeTaskScheduler.Done())
             {
-                AllTasksComplete = true;
+                waitHandle.Set();
             }
             //}
         }

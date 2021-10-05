@@ -1,4 +1,5 @@
 ﻿using Classifiers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -37,40 +38,33 @@ namespace SnaffCore.Config
                         break;
                     case MatchListType.Contains:
                         classifierRule.Regexes = new List<Regex>();
-                        foreach (string word in classifierRule.WordList)
+                        foreach (string pattern in classifierRule.WordList)
                         {
-                            string pattern = Regex.Escape(word);
                             classifierRule.Regexes.Add(new Regex(pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
 
                         break;
                     case MatchListType.EndsWith:
-                        foreach (string word in classifierRule.WordList)
+                        foreach (string pattern in classifierRule.WordList)
                         {
-                            string pattern = Regex.Escape(word);
-                            pattern = pattern + "$";
-                            classifierRule.Regexes.Add(new Regex(pattern,
+                            classifierRule.Regexes.Add(new Regex(pattern + "$",
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
 
                         break;
                     case MatchListType.StartsWith:
-                        foreach (string word in classifierRule.WordList)
+                        foreach (string pattern in classifierRule.WordList)
                         {
-                            string pattern = Regex.Escape(word);
-                            pattern = "^" + pattern;
-                            classifierRule.Regexes.Add(new Regex(pattern,
+                            classifierRule.Regexes.Add(new Regex("^" + pattern,
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
 
                         break;
                     case MatchListType.Exact:
-                        foreach (string word in classifierRule.WordList)
+                        foreach (string pattern in classifierRule.WordList)
                         {
-                            string pattern = Regex.Escape(word);
-                            pattern = "^" + pattern + "$";
-                            classifierRule.Regexes.Add(new Regex(pattern,
+                            classifierRule.Regexes.Add(new Regex("^" + pattern + "$",
                                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
                         }
 
@@ -79,6 +73,10 @@ namespace SnaffCore.Config
                 }
             }
 
+            // figure out which rules match our interest level flag
+            ClassifierRules = (from classifier in ClassifierRules
+                               where IsInterest(classifier)
+                               select classifier).ToList();
             // sort everything into enumeration scopes
             ShareClassifiers = (from classifier in ClassifierRules
                                 where classifier.EnumerationScope == EnumerationScope.ShareEnumeration
@@ -94,9 +92,31 @@ namespace SnaffCore.Config
                                    select classifier).ToList();
         }
 
+        private bool IsInterest(ClassifierRule classifier)
+        {
+            /*
+             * Keep all discard & archive parsing rules.
+             * Else, if rule (or child rule, recursive) interest level is lower than provided (0 default), then discard
+             */
+            if (!String.IsNullOrEmpty(classifier.RelayTarget))
+            {
+                return IsInterest(ClassifierRules.First(thing => thing.RuleName == classifier.RelayTarget));
+            }
+            return !(
+                (
+                    classifier.MatchAction == MatchAction.Snaffle ||
+                    classifier.MatchAction == MatchAction.CheckForKeys
+                ) &&
+                (
+                    (classifier.Triage == Triage.Red && InterestLevel > 2) ||
+                    (classifier.Triage == Triage.Yellow && InterestLevel > 1) ||
+                    (classifier.Triage == Triage.Green && InterestLevel > 0)
+                )
+            );
+        }
         public void BuildDefaultClassifiers()
         {
-            this.ClassifierRules = new List<ClassifierRule>();
+this.ClassifierRules = new List<ClassifierRule>();
             BuildShareRules();
             BuildPathRules();
             BuildFileDiscardRules();

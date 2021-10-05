@@ -1,8 +1,13 @@
 ﻿using SnaffCore.Concurrency;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using static SnaffCore.Config.Options;
+
+#if ULTRASNAFFLER
+using Toxy;
+#endif
 
 namespace Classifiers
 {
@@ -40,8 +45,26 @@ namespace Classifiers
                         case MatchLoc.FileContentAsString:
                             try
                             {
-                                string fileString = File.ReadAllText(fileInfo.FullName);
+                                string fileString;
 
+#if ULTRASNAFFLER
+                                // if it's an office doc or a PDF or something, parse it to a string first i guess?
+                                List<string> parsedExtensions = new List<string>()
+                                {
+                                    ".doc",".docx",".xls",".xlsx",".eml",".msg",".pdf",".ppt",".pptx",".rtf",".docm",".xlsm",".pptm",".dot",".dotx",".dotm",".xlt",".xlsm",".xltm"
+                                };
+
+                                if (parsedExtensions.Contains(fileInfo.Extension))
+                                {
+                                    fileString = ParseFileToString(fileInfo);
+                                }
+                                else
+                                {
+                                    fileString = File.ReadAllText(fileInfo.FullName);
+                                }
+#else
+                                fileString = File.ReadAllText(fileInfo.FullName);
+#endif
                                 TextClassifier textClassifier = new TextClassifier(ClassifierRule);
                                 TextResult textResult = textClassifier.TextMatch(fileString);
                                 if (textResult != null)
@@ -51,6 +74,7 @@ namespace Classifiers
                                         MatchedRule = ClassifierRule,
                                         TextResult = textResult
                                     };
+
                                     Mq.FileResult(fileResult);
                                 }
                             }
@@ -64,47 +88,25 @@ namespace Classifiers
                             }
                             return;
                         case MatchLoc.FileLength:
-                            try
+                            bool lengthResult = SizeMatch(fileInfo);
+                            if (lengthResult)
                             {
-                                bool lengthResult = SizeMatch(fileInfo);
-                                if (lengthResult)
+                                fileResult = new FileResult(fileInfo)
                                 {
-                                    fileResult = new FileResult(fileInfo)
-                                    {
-                                        MatchedRule = ClassifierRule
-                                    };
-                                    Mq.FileResult(fileResult);
-                                }
-                            }
-                            catch (UnauthorizedAccessException)
-                            {
-                                return;
-                            }
-                            catch (IOException)
-                            {
-                                return;
+                                    MatchedRule = ClassifierRule
+                                };
+                                Mq.FileResult(fileResult);
                             }
                             return;
                         case MatchLoc.FileMD5:
-                            try
+                            bool Md5Result = MD5Match(fileInfo);
+                            if (Md5Result)
                             {
-                                bool Md5Result = MD5Match(fileInfo);
-                                if (Md5Result)
+                                fileResult = new FileResult(fileInfo)
                                 {
-                                    fileResult = new FileResult(fileInfo)
-                                    {
-                                        MatchedRule = ClassifierRule
-                                    };
-                                    Mq.FileResult(fileResult);
-                                }
-                            }
-                            catch (UnauthorizedAccessException)
-                            {
-                                return;
-                            }
-                            catch (IOException)
-                            {
-                                return;
+                                    MatchedRule = ClassifierRule
+                                };
+                                Mq.FileResult(fileResult);
                             }
                             return;
                         default:
@@ -116,6 +118,16 @@ namespace Classifiers
                 {
                     Mq.Trace("The following file was bigger than the MaxSizeToGrep config parameter:" + fileInfo.FullName);
                 }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Mq.Error($"Not authorized to access file: {fileInfo.FullName}");
+                return;
+            }
+            catch (IOException e)
+            {
+                Mq.Error($"IO Exception on file: {fileInfo.FullName}. {e.Message}");
+                return;
             }
             catch (Exception e)
             {
@@ -142,6 +154,7 @@ namespace Classifiers
             }
             return false;
         }
+
         protected string GetMD5HashFromFile(string fileName)
         {
             using (var md5 = MD5.Create())
@@ -152,6 +165,18 @@ namespace Classifiers
                 }
             }
         }
+
+#if ULTRASNAFFLER
+        public string ParseFileToString(FileInfo fileInfo)
+        {
+            ParserContext context = new ParserContext(fileInfo.FullName);
+            ITextParser parser = ParserFactory.CreateText(context);
+
+                string doc = parser.Parse();
+            return doc;
+        }
+#endif
+
         public bool ByteMatch(byte[] fileBytes)
         {
             // TODO
