@@ -4,7 +4,7 @@ function Invoke-Snaffler
     [CmdletBinding()]
     Param (
         [String]
-        $Command = "-i \\SERVER -o C:\OUTPUTDIRECTORY\snaffler-custom.txt"
+        $Command = "-i \\global.lloydstsb.com\HOME -o C:\OUTPUTDIRECTORY\snaffler-custom.txt"
 
     )
     
