@@ -67,10 +67,13 @@ namespace Snaffler
             ValueArgument<int> grepContextArg = new ValueArgument<int>('j', "grepcontext",
                 "How many bytes of context either side of found strings in files to show, e.g. -j 200");
             SwitchArgument domainUserArg = new SwitchArgument('u', "domainusers", "Makes Snaffler grab a list of interesting-looking accounts from the domain and uses them in searches.", false);
-            ValueArgument<int> maxThreadsArg = new ValueArgument<int>('a', "maxthreads", "How many threads to be snaffling with. Any less than 4 and you're gonna have a bad time.");
+            ValueArgument<int> maxThreadsArg = new ValueArgument<int>('x', "maxthreads", "How many threads to be snaffling with. Any less than 4 and you're gonna have a bad time.");
             SwitchArgument tsvArg = new SwitchArgument('y', "tsv", "Makes Snaffler output as tsv.", false);
-
-            // list of letters i haven't used yet: efgknpqwx
+            SwitchArgument dfsArg = new SwitchArgument('f', "dfs", "Limits Snaffler to finding file shares via DFS, for \"OPSEC\" reasons.", false);
+            SwitchArgument findSharesOnlyArg = new SwitchArgument('a', "sharesonly",
+                "Stops after finding shares, doesn't walk their filesystems.", false);
+            ValueArgument<string> compTargetArg = new ValueArgument<string>('n', "comptarget", "Computer (or comma separated list) to target.");
+            // list of letters i haven't used yet: egknpqw
 
             CommandLineParser.CommandLineParser parser = new CommandLineParser.CommandLineParser();
             parser.Arguments.Add(configFileArg);
@@ -88,7 +91,10 @@ namespace Snaffler
             parser.Arguments.Add(grepContextArg);
             parser.Arguments.Add(domainUserArg);
             parser.Arguments.Add(tsvArg);
+            parser.Arguments.Add(dfsArg);
+            parser.Arguments.Add(findSharesOnlyArg);
             parser.Arguments.Add(maxThreadsArg);
+            parser.Arguments.Add(compTargetArg);
 
             // extra check to handle builtin behaviour from cmd line arg parser
             if ((args.Contains("--help") || args.Contains("/?") || args.Contains("help") || args.Contains("-h") || args.Length == 0))
@@ -133,6 +139,30 @@ namespace Snaffler
                     Mq.Degub("Logging to file at " + parsedConfig.LogFilePath);
                 }
 
+                if (dfsArg.Parsed)
+                {
+                    parsedConfig.DfsOnly = dfsArg.Value;
+                }
+
+                if (compTargetArg.Parsed)
+                {
+                    string[] compTargets = null;
+                    if (compTargetArg.Value.Contains(","))
+                    {
+                        compTargets = compTargetArg.Value.Split(',');
+                        
+                    }
+                    else
+                    {
+                        compTargets = new string[] { compTargetArg.Value };
+                    }
+                    parsedConfig.ComputerTargets = compTargets;
+                }
+
+                if (findSharesOnlyArg.Parsed)
+                {
+                    parsedConfig.ScanFoundShares = false;
+                }
                 if (maxThreadsArg.Parsed)
                 {
                     parsedConfig.MaxThreads = maxThreadsArg.Value;
@@ -184,7 +214,7 @@ namespace Snaffler
                 if (dirTargetArg.Parsed)
                 {
                     parsedConfig.ShareFinderEnabled = false;
-                    parsedConfig.PathTargets = new string[] { dirTargetArg.Value };
+                    parsedConfig.PathTargets.Add(dirTargetArg.Value);
                     Mq.Degub("Disabled finding shares.");
                     Mq.Degub("Target path is " + dirTargetArg.Value);
                 }
@@ -194,11 +224,6 @@ namespace Snaffler
                     parsedConfig.MaxSizeToGrep = maxGrepSizeArg.Value;
                     Mq.Degub("We won't bother looking inside files if they're bigger than " + parsedConfig.MaxSizeToGrep +
                              " bytes");
-                }
-
-                if (snaffleArg.Parsed)
-                {
-                    parsedConfig.SnafflePath = snaffleArg.Value;
                 }
 
                 if (snaffleSizeArg.Parsed)
