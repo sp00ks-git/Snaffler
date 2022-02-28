@@ -4,7 +4,7 @@ function Invoke-Snaffler
     [CmdletBinding()]
     Param (
         [String]
-        $Command = "-i \\shgas-file -o C:\temp\snaffler-custom.txt"
+        $Command = "-i \\shgas-file\ -o C:\temp\snaffler-custom.txt"
 
     )
     
