@@ -4,6 +4,12 @@ using SnaffCore.ActiveDirectory;
 
 namespace SnaffCore.Config
 {
+    public enum LogType
+    {
+        Plain = 0,
+        JSON = 1
+    }
+
     public partial class Options
     {
         public static Options MyOptions { get; set; }
@@ -18,9 +24,13 @@ namespace SnaffCore.Config
         public int InterestLevel { get; set; } = 0;
         public bool DfsOnly { get; set; } = false;
         public bool DfsShareDiscovery { get; set; } = false;
+        [Nett.TomlIgnore]
         public Dictionary<string, string> DfsSharesDict { get; set; } = new Dictionary<string, string>();
         public List<string> DfsNamespacePaths { get; set; } = new List<string>();
         public string CurrentUser { get; set; } = WindowsIdentity.GetCurrent().Name;
+        public string RuleDir { get; set; }
+
+        public int TimeOut { get; set; } = 5;
 
         // Concurrency Options
         public int MaxThreads { get; set; } = 60;
@@ -34,6 +44,7 @@ namespace SnaffCore.Config
         // Logging Options
         public bool LogToFile { get; set; } = false;
         public string LogFilePath { get; set; }
+        public LogType LogType { get; set; }
         public bool LogTSV { get; set; } = false;
         public char Separator { get; set; } = ' ';
         public bool LogToConsole { get; set; } = true;
@@ -87,12 +98,12 @@ namespace SnaffCore.Config
             "scom",
             "opsmgr",
             "adm",
+            "adcs",
             "MSOL",
             "adsync",
             "thycotic",
             "secretserver",
             "cyberark",
-            "sccm",
             "configmgr"
         };
 

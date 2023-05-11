@@ -1,5 +1,6 @@
 ﻿using NLog;
 using NLog.Config;
+using NLog.Layouts;
 using NLog.Targets;
 using SnaffCore;
 using SnaffCore.Concurrency;
@@ -8,6 +9,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Snaffler
 {
@@ -50,6 +53,12 @@ namespace Snaffler
             {
                 // parse cli opts in
                 Options = Config.Parse(args);
+
+                if (Options == null)
+                {
+                    // bail out because the user was just running help
+                    return;
+                }
 
                 // set up the  TSV output if the flag is set
                 if (Options.LogTSV)
@@ -139,7 +148,29 @@ namespace Snaffler
                 {
                     logfile = new FileTarget("logfile") { FileName = Options.LogFilePath };
                     nlogConfig.AddRule(LogLevel, LogLevel.Fatal, logfile);
-                    logfile.Layout = "${message}";
+                    if (Options.LogType == LogType.Plain)
+                    {
+                        logfile.Layout = "${message}";
+                    }
+                    else if (Options.LogType == LogType.JSON)
+                    {
+                        var eventProperties = new JsonLayout();
+                        eventProperties.IncludeAllProperties = true;
+                        eventProperties.MaxRecursionLimit = 5;
+                        var jsonLayout = new JsonLayout
+                        {
+                            Attributes =
+                            {
+                                new JsonAttribute("time", "${longdate}"),
+                                new JsonAttribute("level", "${level}"),
+                                new JsonAttribute("message", "${message}"),
+                                new JsonAttribute("eventProperties", eventProperties,
+                                //don't escape layout
+                                false)
+                            }
+                        };
+                        logfile.Layout = jsonLayout;
+                    }
                 }
 
                 // Apply config           
@@ -153,12 +184,20 @@ namespace Snaffler
                 }
 
                 controller = new SnaffCon(Options);
-                Task thing = Task.Factory.StartNew(() => { controller.Execute(); });
 
-                while (true)
+                var tokenSource = new CancellationTokenSource();
+                var token = tokenSource.Token;
+                Task thing = Task.Factory.StartNew(() => { controller.Execute(); }, token);
+                bool exit = false;
+
+                while (exit == false)
                 {
-                    HandleOutput();
+                    if (HandleOutput() == true)
+                    {
+                        exit = true;
+                    }
                 }
+                return;
             }
             catch (Exception e)
             {
@@ -179,16 +218,29 @@ namespace Snaffler
             {
                 Console.ReadKey();
             }
-            Environment.Exit(1);
         }
 
-        private void HandleOutput()
+        private bool HandleOutput()
         {
             BlockingMq Mq = BlockingMq.GetMq();
             foreach (SnafflerMessage message in Mq.Q.GetConsumingEnumerable())
             {
-                ProcessMessage(message);
+                if (Options.LogType == LogType.Plain)
+                {
+                    ProcessMessage(message);
+                }
+                else if (Options.LogType == LogType.JSON)
+                {
+                    ProcessMessageJSON(message);
+                }
+
+                // catch terminating messages and bail out of the master 'while' loop
+                if ((message.Type == SnafflerMessageType.Fatal) || (message.Type == SnafflerMessageType.Finish))
+                {
+                    return true;
+                }
             }
+            return false;
         }
 
         private void ProcessMessage(SnafflerMessage message)
@@ -225,7 +277,6 @@ namespace Snaffler
                     {
                         Console.ReadKey();
                     }
-                    Environment.Exit(1);
                     break;
                 case SnafflerMessageType.Finish:
                     Logger.Info("Snaffler out.");
@@ -235,7 +286,66 @@ namespace Snaffler
                         Console.WriteLine("Press any key to exit.");
                         Console.ReadKey();
                     }
-                    Environment.Exit(0);
+                    break;
+            }
+        }
+
+        private void ProcessMessageJSON(SnafflerMessage message)
+        {
+            //  standardized time formatting,  UTC
+            string datetime = String.Format("{1}{0}{2:u}{0}", Options.Separator, hostString(), message.DateTime.ToUniversalTime());
+
+            switch (message.Type)
+            {
+                case SnafflerMessageType.Trace:
+                    //Logger.Trace(message);
+                    Logger.Trace(datetime + "[Trace]" + Options.Separator + message.Message, message);
+                    break;
+                case SnafflerMessageType.Degub:
+                    //Logger.Debug(message);
+                    Logger.Debug(datetime + "[Degub]" + Options.Separator + message.Message, message);
+                    break;
+                case SnafflerMessageType.Info:
+                    //Logger.Info(message);
+                    Logger.Info(datetime + "[Info]" + Options.Separator + message.Message, message);
+                    break;
+                case SnafflerMessageType.FileResult:
+                    //Logger.Warn(message);
+                    Logger.Warn(datetime + "[File]" + Options.Separator + FileResultLogFromMessage(message), message);
+                    break;
+                case SnafflerMessageType.DirResult:
+                    //Logger.Warn(message);
+                    Logger.Warn(datetime + "[Dir]" + Options.Separator + DirResultLogFromMessage(message), message);
+                    break;
+                case SnafflerMessageType.ShareResult:
+                    //Logger.Warn(message);
+                    Logger.Warn(datetime + "[Share]" + Options.Separator + ShareResultLogFromMessage(message), message);
+                    break;
+                case SnafflerMessageType.Error:
+                    //Logger.Error(message);
+                    Logger.Error(datetime + "[Error]" + Options.Separator + message.Message, message);
+                    break;
+                case SnafflerMessageType.Fatal:
+                    //Logger.Fatal(message);
+                    Logger.Fatal(datetime + "[Fatal]" + Options.Separator + message.Message, message);
+                    if (Debugger.IsAttached)
+                    {
+                        Console.ReadKey();
+                    }
+                    break;
+                case SnafflerMessageType.Finish:
+                    Logger.Info("Snaffler out.");
+
+                    if (Debugger.IsAttached)
+                    {
+                        Console.WriteLine("Press any key to exit.");
+                        Console.ReadKey();
+                    }
+                    if (Options.LogType == LogType.JSON) 
+                    {
+                        Logger.Info("Normalising output, please wait...");
+                        FixJSONOutput();
+                    }
                     break;
             }
         }
@@ -319,6 +429,7 @@ namespace Snaffler
                 {
                     matchedstring = message.FileResult.TextResult.MatchedStrings[0];
                     matchcontext = message.FileResult.TextResult.MatchContext;
+                    matchcontext = Regex.Replace(matchcontext, @"\r\n?|\n", "\\n"); // Replace newlines with \n for consistent log lines
                 }
 
                 return string.Format(fileResultTemplate, triageString, matchedclassifier, canread, canwrite, canmodify, matchedstring, fileSizeString, modifiedStamp,
@@ -425,6 +536,34 @@ namespace Snaffler
             }
 
             Console.WriteLine("\n");
+        }
+
+        //This is probably slow but it is a quick and easy fix for now.
+        private void FixJSONOutput() 
+        {
+            //Rename the log file temporarily
+            File.Move(Options.LogFilePath, Options.LogFilePath + ".tmp");
+            //Prepare the normalised file
+            StreamWriter file = new StreamWriter(Options.LogFilePath);
+            //Read in the original log file to an array
+            string[] lines = System.IO.File.ReadAllLines(Options.LogFilePath + ".tmp");
+            //Write the surrounding template that we need.
+            file.Write("{\"entries\": [\n");
+            //Write all the lines into the new file but add a comma after all but the last so it becomes valid JSON.
+            for (int ii = 0; ii < lines.Length -1; ii++)
+            {
+                file.WriteLine(lines[ii] + ",");
+            }
+            //Add the last line but without a comma
+            file.WriteLine(lines[lines.Length - 1]);
+            //Close out the file's contents with the last of the JSON to make it valid.
+            file.Write("]\n}");
+            //Flush the output
+            file.Flush();
+            //Close the file
+            file.Close();
+            //Delete the temporary file.
+            File.Delete(Options.LogFilePath + ".tmp");
         }
     }
 }

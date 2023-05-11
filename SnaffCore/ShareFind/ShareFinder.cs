@@ -1,4 +1,4 @@
-﻿using Classifiers;
+﻿using SnaffCore.Classifiers;
 using SnaffCore.Concurrency;
 using SnaffCore.TreeWalk;
 using System;
@@ -35,6 +35,14 @@ namespace SnaffCore.ShareFind
 
             foreach (HostShareInfo hostShareInfo in hostShareInfos)
             {
+
+                // skip IPC$ and PRINT$ shares for #OPSEC!!!
+                List<string> neverScan = new List<string> { "ipc$", "print$" };
+                if (neverScan.Contains(hostShareInfo.shi1_netname.ToLower()))
+                {
+                    continue;
+                }
+
                 string shareName = GetShareName(hostShareInfo, computer);
                 if (!String.IsNullOrWhiteSpace(shareName))
                 {
@@ -124,12 +132,12 @@ namespace SnaffCore.ShareFind
                         {                            
                             string dfsUncPath = MyOptions.DfsSharesDict[shareName];
 
-                            Mq.Trace(String.Format("Matched host path {0} to DFS {1}",shareName, dfsUncPath));
+                            Mq.Degub(String.Format("Matched host path {0} to DFS {1}",shareName, dfsUncPath));
 
                             // and if we haven't already scanned this share
                             if (MyOptions.DfsNamespacePaths.Contains(dfsUncPath))
                             {
-                                Mq.Trace(String.Format("Will scan {0} using DFS referral instead of explicit host", dfsUncPath));
+                                Mq.Degub(String.Format("Will scan {0} using DFS referral instead of explicit host", dfsUncPath));
 
                                 // sub out the \\computer\share path for the dfs namespace path. this makes sure we hit the most efficient endpoint. 
                                 shareResult.SharePath = dfsUncPath;
@@ -144,7 +152,6 @@ namespace SnaffCore.ShareFind
                                 break;
                             }
                         }
-
 
                         //  If the share is readable then dig deeper.
                         if (IsShareReadable(shareResult.SharePath))
@@ -189,9 +196,8 @@ namespace SnaffCore.ShareFind
                                         Mq.Error(e.ToString());
                                     }
                                 });
-
-                                Mq.ShareResult(shareResult);
                             }
+                            Mq.ShareResult(shareResult);
                         }
                         else if (MyOptions.LogDeniedShares == true)
                         {
