@@ -8,7 +8,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Snaffler</RootNamespace>
     <AssemblyName>Snaffler</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -109,6 +109,9 @@
     <PackageReference Include="NLog">
       <Version>4.7.15</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="SnaffRules\DefaultRules\PostMatchRules\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
